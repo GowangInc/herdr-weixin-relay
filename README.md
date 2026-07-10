@@ -18,6 +18,7 @@ Local Herdr plugin + PID-file Node daemon for relaying personal WeChat text mess
 - `ilink.mjs` — QR login, `getupdates`, and text `sendmessage` protocol calls.
 - `lib.mjs` — config/state, PID, target, workspace, and Herdr helpers.
 - `check.mjs` — local protocol self-check with a fake ilink server.
+- `TODO.md` — deferred compatibility and response-adapter work.
 - `README.md` — this file.
 
 ### Quick start
@@ -77,7 +78,7 @@ Inbound text messages are forwarded as `[WeChat <userId>] <message>` to the conf
 
 ### Compatibility
 
-The WeChat login, long polling, outbound `send-test`, and basic WeChat-to-Herdr forwarding are not inherently tied to OMP. Automatic response bridging **is OMP-specific today**: the daemon discovers the target's OMP session JSONL through Herdr metadata and parses OMP `assistant` message events. Other tools can still receive inbound WeChat text in a pane, but they will not automatically reply back to WeChat unless an adapter is added for that tool's response stream/schema.
+The WeChat login, long polling, outbound `send-test`, and basic WeChat-to-Herdr forwarding are not inherently tied to OMP. Automatic response bridging **is OMP-specific today**: the daemon discovers the target's OMP session JSONL through Herdr metadata and parses OMP `assistant` message events. Other tools can still receive inbound WeChat text in a pane, but they will not automatically reply back to WeChat unless an adapter is added for that tool's response stream/schema. See `TODO.md` for the deferred adapter plan.
 
 ### WeChat commands
 
@@ -113,6 +114,7 @@ Local Herdr 插件 + PID 文件 Node 守护进程，通过腾讯 `ilink` bot 协
 - `ilink.mjs` — 二维码登录、`getupdates` 和文本 `sendmessage` 协议调用。
 - `lib.mjs` — 配置/状态、PID、目标、工作区与 Herdr 辅助函数。
 - `check.mjs` — 使用伪造 ilink 服务器进行本地协议自检。
+- `TODO.md` — 延后的兼容性与响应适配器工作。
 - `README.md` — 本文件。
 
 ### 快速开始
@@ -172,7 +174,7 @@ node cli.mjs login
 
 ### 兼容性
 
-微信登录、长轮询、出站 `send-test` 和基础的微信到 Herdr 转发并不天然绑定 OMP。自动回复桥接**目前是 OMP 专用**：守护进程通过 Herdr 元数据找到目标的 OMP 会话 JSONL，并解析 OMP 的 `assistant` 消息事件。其他工具仍然可以在面板中接收入站微信文本，但除非为该工具的响应流/数据结构添加适配器，否则不会自动把回复发回微信。
+微信登录、长轮询、出站 `send-test` 和基础的微信到 Herdr 转发并不天然绑定 OMP。自动回复桥接**目前是 OMP 专用**：守护进程通过 Herdr 元数据找到目标的 OMP 会话 JSONL，并解析 OMP 的 `assistant` 消息事件。其他工具仍然可以在面板中接收入站微信文本，但除非为该工具的响应流/数据结构添加适配器，否则不会自动把回复发回微信。延后的适配器计划见 `TODO.md`。
 
 ### 微信命令
 
