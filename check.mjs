@@ -21,6 +21,17 @@ try {
   assert.deepEqual(lib.normalizeTarget("agent:omp"), { kind: "agent", target: "omp" });
   assert.equal(lib.truncateToBytes("ab中文", 4), "ab");
   assert.deepEqual(lib.extractTextItems({ item_list: [{ type: 1, text_item: { text: "hi" } }, { type: 2 }] }), { text: "hi", mediaTypes: [2] });
+  assert.equal(lib.extractAssistantText({
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "private scratchpad" },
+        { type: "text", text: "reply one" },
+        { type: "text", text: "reply two" },
+      ],
+    },
+  }), "reply one\nreply two");
 
   const seen = [];
   const server = http.createServer(async (request, response) => {

@@ -167,6 +167,25 @@ export function saveContacts(contacts) {
   writePrivateJson(contactsPath(), contacts);
 }
 
+export function responseStatePath() {
+  return join(stateDir(), "response-state.json");
+}
+
+export function loadResponseState() {
+  const state = readJsonFile(responseStatePath(), { sentAssistantIds: [], pendingResponses: [] });
+  state.sentAssistantIds = Array.isArray(state.sentAssistantIds) ? state.sentAssistantIds : [];
+  state.pendingResponses = Array.isArray(state.pendingResponses) ? state.pendingResponses : [];
+  return state;
+}
+
+export function saveResponseState(state) {
+  writePrivateJson(responseStatePath(), {
+    ...state,
+    sentAssistantIds: Array.isArray(state.sentAssistantIds) ? state.sentAssistantIds.slice(-200) : [],
+    pendingResponses: Array.isArray(state.pendingResponses) ? state.pendingResponses.slice(-50) : [],
+  });
+}
+
 export function updateContact(userId, patch) {
   if (!userId) return null;
   const contacts = loadContacts();
@@ -199,14 +218,67 @@ export function loadSettings() {
   ensureDirs();
   loadDotEnv();
   const envTarget = normalizeTarget(process.env.HERDR_WEIXIN_TARGET || "");
+  const modelRole = validateModelRole(process.env.HERDR_WEIXIN_MODEL_ROLE || "wechat");
   return {
     port: envInt("HERDR_WEIXIN_PORT", 27187, { min: 1024, max: 65535 }),
     herdrBin: process.env.HERDR_BIN_PATH || process.env.HERDR_BIN || "herdr",
     target: envTarget || getDefaultTarget(),
     allowFrom: new Set(splitList(process.env.HERDR_WEIXIN_ALLOW_FROM)),
     botAgent: sanitizeBotAgent(process.env.HERDR_WEIXIN_BOT_AGENT || `HerdrWeixinRelay/${pluginVersion}`),
+    modelRole,
   };
 }
+
+function validateModelRole(role) {
+  const roles = loadOmpModelRoles();
+  if (roles[role]) return role;
+  return "tiny";
+}
+
+export function ompAgentConfigPath() {
+  return join(homedir(), ".omp", "agent", "config.yml");
+}
+
+export function loadOmpModelRoles() {
+  const path = ompAgentConfigPath();
+  try {
+    const raw = readFileSync(path, "utf8");
+    const roles = {};
+    let inRoles = false;
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("modelRoles:")) {
+        inRoles = true;
+        continue;
+      }
+      if (inRoles) {
+        if (line.startsWith("  ") || line.startsWith("\t")) {
+          const colon = trimmed.indexOf(":");
+          if (colon > 0) {
+            const role = trimmed.slice(0, colon).trim();
+            const selector = trimmed.slice(colon + 1).trim();
+            if (role && selector) roles[role] = selector;
+          }
+        } else if (trimmed) {
+          break;
+        }
+      }
+    }
+    return roles;
+  } catch (error) {
+    if (error?.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+export function modelSelectorForRole(role) {
+  return loadOmpModelRoles()[role];
+}
+
+export function listModelRoles() {
+  return Object.keys(loadOmpModelRoles());
+}
+
 
 export function normalizeTarget(value) {
   if (!value) return null;
@@ -292,6 +364,23 @@ export function extractTextItems(message) {
     else if (item?.type && item.type !== 1) media.push(item.type);
   }
   return { text: texts.join("\n").trim(), mediaTypes: media };
+}
+
+export function extractAssistantText(event) {
+  const message = event?.type === "message" ? event.message : event;
+  if (message?.role !== "assistant") return "";
+  const content = message.content;
+  if (typeof content === "string") return content.trim();
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part?.type === "text" && typeof part.text === "string") return part.text;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
 }
 
 export function readJsonEnv(name) {
@@ -398,6 +487,31 @@ export async function ensureWorkspace(label = "Weixin Relay") {
   const id = workspaceId(found);
   if (!id) throw new Error(`workspace ${label} was created but could not be found`);
   return id;
+}
+
+export async function ensureWeChatSessionPane({ label = "WeChat", agentName = "WeChat" } = {}) {
+  const settings = loadSettings();
+  const workspace = await ensureWorkspace();
+  const paneList = await runCommand(settings.herdrBin, ["pane", "list"], { timeoutMs: 10_000 });
+  if (paneList.status !== 0) throw new Error(`pane list failed: ${paneList.stderr || paneList.stdout || paneList.status}`);
+  const paneData = parseJsonCommand(paneList.stdout, "pane list");
+  const panes = Array.isArray(paneData?.result?.panes) ? paneData.result.panes : [];
+  const existing = panes.find((p) => p.workspace_id === workspace && (p.label === label || p.name === agentName || p.agent === agentName));
+  if (existing) return existing.pane_id;
+
+  const modelSelector = modelSelectorForRole(settings.modelRole);
+  const ompArgs = ["omp", "--cwd", pluginRoot];
+  if (modelSelector) ompArgs.push("--model", modelSelector);
+  const result = await runCommand(settings.herdrBin, [
+    "agent", "start", agentName,
+    "--workspace", workspace,
+    "--split", "right",
+    "--focus",
+    "--", ...ompArgs,
+  ], { timeoutMs: 15_000 });
+  if (result.status !== 0) throw new Error(`WeChat session pane creation failed: ${result.stderr || result.stdout || result.status}`);
+  const started = parseJsonCommand(result.stdout, "agent start");
+  return started?.result?.agent?.pane_id || started?.result?.pane_id;
 }
 
 export async function openPaneInWorkspace({ entrypoint, placement = "tab", workspaceId }) {

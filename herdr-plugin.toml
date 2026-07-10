@@ -41,6 +41,16 @@ title = "Route WeChat to focused pane or agent"
 command = ["node", "cli.mjs", "target-current"]
 
 [[actions]]
+id = "ensure-session"
+title = "Create or focus WeChat session pane"
+command = ["node", "cli.mjs", "ensure-session"]
+
+[[actions]]
+id = "model-roles"
+title = "List available OMP model roles"
+command = ["node", "cli.mjs", "model-roles"]
+
+[[actions]]
 id = "send-test"
 title = "Send WeChat test message"
 command = ["node", "cli.mjs", "send-test"]

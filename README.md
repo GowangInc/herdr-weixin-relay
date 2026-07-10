@@ -37,9 +37,11 @@ herdr plugin action invoke local.herdr-weixin-relay.start
 - `setup` — creates or focuses the dedicated `Weixin Relay` Herdr workspace.
 - `login` — opens a tab in the `Weixin Relay` workspace with a live QR login and verification prompt.
 - `target-current` — saves the focused Herdr agent/pane as the inbound WeChat target.
+- `ensure-session` — creates or focuses the dedicated `WeChat` agent pane and saves it as the inbound target.
+- `model-roles` — lists OMP model roles available for the dedicated WeChat session pane.
 - `start` — starts the PID-file daemon and opens the logs pane in the `Weixin Relay` workspace.
 - `stop` — stops the daemon.
-- `status` — prints config, account, target, PID, and health.
+- `status` — prints config, account, target, PID, model role, and health.
 - `send-test` — sends a test message to the last inbound WeChat sender.
 
 ### Manual terminal login
@@ -67,9 +69,11 @@ Credentials and sync cursor are stored locally at:
 
 Do not sync or publish that state directory.
 
+Set `HERDR_WEIXIN_MODEL_ROLE` in that `.env` to choose the OMP model role used when the daemon creates the dedicated `WeChat` agent pane. Use `node cli.mjs model-roles` to list valid roles and `node cli.mjs set-model-role <role>` to update the plugin config from a terminal.
+
 ### How messages work
 
-Inbound text messages are forwarded as `[WeChat <userId>] <message>` to the configured target. For pane targets, the daemon does not append a newline, so it will not execute text in a shell. For agent targets, it appends a newline so the message is submitted.
+Inbound text messages are forwarded as `[WeChat <userId>] <message>` to the configured target. Plain pane targets receive text without submitting it. Agent targets use `herdr agent send`; pane targets that host an agent receive the text and a Return keypress so the message is submitted. For agent-backed targets, the daemon watches the OMP session and sends the next assistant text response back to the originating WeChat user.
 
 ### WeChat commands
 
@@ -123,9 +127,11 @@ herdr plugin action invoke local.herdr-weixin-relay.start
 - `setup` — 创建或聚焦专用的 `Weixin Relay` Herdr 工作区。
 - `login` — 在 `Weixin Relay` 工作区中打开一个标签页，显示实时二维码登录和验证码提示。
 - `target-current` — 将当前聚焦的 Herdr 代理/面板保存为入站微信目标。
+- `ensure-session` — 创建或聚焦专用的 `WeChat` 代理面板，并将其保存为入站目标。
+- `model-roles` — 列出专用微信会话面板可用的 OMP 模型角色。
 - `start` — 启动 PID 文件守护进程，并在 `Weixin Relay` 工作区打开日志面板。
 - `stop` — 停止守护进程。
-- `status` — 打印配置、账户、目标、PID 和健康状态。
+- `status` — 打印配置、账户、目标、PID、模型角色和健康状态。
 - `send-test` — 向上一次发信给你的微信联系人发送测试消息。
 
 ### 手动终端登录
@@ -153,9 +159,11 @@ node cli.mjs login
 
 请勿同步或发布该状态目录。
 
+在该 `.env` 中设置 `HERDR_WEIXIN_MODEL_ROLE` 可选择守护进程创建专用 `WeChat` 代理面板时使用的 OMP 模型角色。使用 `node cli.mjs model-roles` 列出可用角色，或在终端中运行 `node cli.mjs set-model-role <角色>` 更新插件配置。
+
 ### 消息转发机制
 
-入站文本消息会以 `[WeChat <userId>] <message>` 格式转发到配置目标。面板目标不会追加换行符，因此不会在 shell 中执行文本；代理目标会追加换行符，以便消息被提交。
+入站文本消息会以 `[WeChat <userId>] <message>` 格式转发到配置目标。普通面板目标只接收文本，不会提交执行；代理目标通过 `herdr agent send` 发送；承载代理的面板目标会接收文本并发送 Return 键，以便消息被提交。对于承载代理的目标，守护进程会监听 OMP 会话，并将下一条助手文本回复发回原微信用户。
 
 ### 微信命令
 

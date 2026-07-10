@@ -3,16 +3,20 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
+  atomicWrite,
   closeFd,
   configDir,
   ensureDirs,
+  ensureWeChatSessionPane,
   ensureWorkspace,
   getServiceHealth,
   isProcessAlive,
   lastContact,
+  listModelRoles,
   loadAccount,
   loadSettings,
   logPath,
+  modelSelectorForRole,
   normalizeBaseUrl,
   openLogFd,
   openPaneInWorkspace,
@@ -58,6 +62,15 @@ try {
     case "target-current":
       await targetCurrent();
       break;
+    case "ensure-session":
+      await ensureSession();
+      break;
+    case "model-roles":
+      await listModelRolesCommand();
+      break;
+    case "set-model-role":
+      await setModelRole(args[0]);
+      break;
     case "send":
       await sendManual(args);
       break;
@@ -97,6 +110,9 @@ Commands:
   stop              stop the Weixin relay daemon
   status            show daemon/account/target status
   target-current    save the current Herdr pane/agent as inbound target
+  ensure-session    create/focus the dedicated WeChat session pane and set it as target
+  model-roles       list available OMP model roles
+  set-model-role    set the default model role for the WeChat session pane
   send <user> <txt> send text to a WeChat user id
   send-test         send a test to the last inbound WeChat sender
   logs              tail/poll the daemon log and health
@@ -249,6 +265,7 @@ async function status() {
   console.log(`Log: ${logPath()}`);
   console.log(`Account: ${account?.accountId ? "configured" : "missing"}`);
   console.log(`Target: ${settings.target ? `${settings.target.kind}:${settings.target.target}` : "unset"}`);
+  console.log(`Model role: ${settings.modelRole}`);
   console.log(`PID file: ${pid || "none"} (${isProcessAlive(pid) ? "alive" : "not running"})`);
   try {
     const health = await getServiceHealth();
@@ -264,6 +281,44 @@ async function targetCurrent() {
   if (!target) throw new Error("No focused Herdr pane or agent was present in HERDR_PLUGIN_CONTEXT_JSON.");
   setDefaultTarget(target);
   console.log(`Inbound WeChat messages will route to ${target.kind}:${target.target}`);
+}
+
+async function ensureSession() {
+  const paneId = await ensureWeChatSessionPane();
+  const target = { kind: "pane", target: paneId };
+  setDefaultTarget(target);
+  console.log(`WeChat session pane: ${paneId}`);
+  const settings = loadSettings();
+  console.log(`Default target: ${settings.target.kind}:${settings.target.target}`);
+  console.log(`Model role: ${settings.modelRole}`);
+}
+
+async function listModelRolesCommand() {
+  const roles = listModelRoles();
+  const settings = loadSettings();
+  console.log("Available OMP model roles:");
+  for (const role of roles) {
+    const marker = role === settings.modelRole ? " (current)" : "";
+    const selector = modelSelectorForRole(role) || "";
+    console.log(`  ${role}${marker}${selector ? ` — ${selector}` : ""}`);
+  }
+}
+
+async function setModelRole(role) {
+  if (!role) throw new Error("Usage: node cli.mjs set-model-role <role>");
+  const roles = listModelRoles();
+  if (!roles.includes(role)) throw new Error(`Unknown role: ${role}. Available: ${roles.join(", ")}`);
+  const envPath = join(configDir(), ".env");
+  let content = "";
+  try {
+    content = readFileSync(envPath, "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const lines = content.split("\n").filter((line) => !line.startsWith("HERDR_WEIXIN_MODEL_ROLE="));
+  lines.push(`HERDR_WEIXIN_MODEL_ROLE=${role}`);
+  atomicWrite(envPath, `${lines.filter(Boolean).join("\n")}\n`, 0o600);
+  console.log(`Default model role set to ${role}. New WeChat session panes will use this role.`);
 }
 
 async function sendManual(argv) {
