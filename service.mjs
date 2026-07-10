@@ -36,6 +36,8 @@ let lastPollAt = "";
 let lastError = "";
 const agentPaneCache = { updatedAt: 0, paneIds: new Set() };
 const claimedAssistantIds = new Set();
+const sessionResponseQueues = new Map();
+const sessionResponseCursors = new Map();
 
 writePidFile();
 const server = await startHttpServer();
@@ -209,7 +211,7 @@ async function handleInbound(message) {
       const sessionTarget = await ensureDefaultWeChatTarget();
       const responseWatch = await prepareResponseWatch(sessionTarget, fromUserId);
       await forwardToHerdr(sessionTarget, fromUserId, inboundText);
-      if (responseWatch) watchAndSendAssistantResponse(responseWatch).catch((error) => console.error(`${new Date().toISOString()} response bridge error: ${error.message}`));
+      if (responseWatch) queueAssistantResponseWatch(responseWatch);
       return;
     } catch (error) {
       console.error(`${new Date().toISOString()} failed to ensure WeChat session pane: ${error.message}`);
@@ -223,7 +225,7 @@ async function handleInbound(message) {
   }
   const responseWatch = await prepareResponseWatch(target, fromUserId);
   await forwardToHerdr(target, fromUserId, inboundText);
-  if (responseWatch) watchAndSendAssistantResponse(responseWatch).catch((error) => console.error(`${new Date().toISOString()} response bridge error: ${error.message}`));
+  if (responseWatch) queueAssistantResponseWatch(responseWatch);
 }
 
 async function handleCommand(userId, text, contact) {
@@ -299,16 +301,30 @@ async function prepareResponseWatch(target, userId) {
   return watch;
 }
 
+function queueAssistantResponseWatch(watch) {
+  const previous = sessionResponseQueues.get(watch.sessionPath) || Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(() => watchAndSendAssistantResponse(watch))
+    .catch((error) => console.error(`${new Date().toISOString()} response bridge error: ${error.message}`))
+    .finally(() => {
+      if (sessionResponseQueues.get(watch.sessionPath) === next) sessionResponseQueues.delete(watch.sessionPath);
+    });
+  sessionResponseQueues.set(watch.sessionPath, next);
+}
+
 async function watchAndSendAssistantResponse(watch) {
   const deadline = watch.startedAt + RESPONSE_WAIT_MS;
   let keepPending = false;
   try {
+    if (isWatchCursorStale(watch)) return;
     while (!stopping && Date.now() < deadline) {
       const response = await findAssistantResponse(watch);
       if (response) {
         if (!claimAssistantResponse(response.id)) return;
         try {
           await sendToWeixin(watch.userId, response.text);
+          markSessionResponseCursor(watch.sessionPath, response.nextCursor);
           markAssistantResponseSent(response.id);
           console.log(`${new Date().toISOString()} sent Herdr response to WeChat user ${watch.userId}`);
         } catch (error) {
@@ -346,13 +362,22 @@ async function findAssistantResponse(watch) {
     if (!text) continue;
     const id = assistantResponseId(event);
     if (!id || wasAssistantResponseSent(id)) continue;
-    return { id, text };
+    return { id, text, nextCursor: i + 1 };
   }
   return null;
 }
 
 function assistantResponseId(event) {
   return event?.id || event?.message?.responseId || event?.timestamp || "";
+}
+
+function isWatchCursorStale(watch) {
+  return (sessionResponseCursors.get(watch.sessionPath) || 0) >= watch.cursor;
+}
+
+function markSessionResponseCursor(sessionPath, cursor) {
+  const current = sessionResponseCursors.get(sessionPath) || 0;
+  if (cursor > current) sessionResponseCursors.set(sessionPath, cursor);
 }
 
 function claimAssistantResponse(id) {
@@ -416,7 +441,7 @@ async function resumePendingResponses() {
       forgetPendingResponse(watch);
       continue;
     }
-    watchAndSendAssistantResponse(watch).catch((error) => console.error(`${new Date().toISOString()} pending response bridge error: ${error.message}`));
+    queueAssistantResponseWatch(watch);
   }
 }
 
