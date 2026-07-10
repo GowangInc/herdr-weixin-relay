@@ -18,7 +18,6 @@ Local Herdr plugin + PID-file Node daemon for relaying personal WeChat text mess
 - `ilink.mjs` — QR login, `getupdates`, and text `sendmessage` protocol calls.
 - `lib.mjs` — config/state, PID, target, workspace, and Herdr helpers.
 - `check.mjs` — local protocol self-check with a fake ilink server.
-- `TODO.md` — deferred compatibility and response-adapter work.
 - `README.md` — this file.
 
 ### Quick start
@@ -78,7 +77,7 @@ Inbound text messages are forwarded as `[WeChat <userId>] <message>` to the conf
 
 ### Compatibility
 
-The WeChat login, long polling, outbound `send-test`, and basic WeChat-to-Herdr forwarding are not inherently tied to OMP. Automatic response bridging **is OMP-specific today**: the daemon discovers the target's OMP session JSONL through Herdr metadata and parses OMP `assistant` message events. Other tools can still receive inbound WeChat text in a pane, but they will not automatically reply back to WeChat unless an adapter is added for that tool's response stream/schema. See `TODO.md` for the deferred adapter plan.
+The WeChat login, long polling, outbound `send-test`, and basic WeChat-to-Herdr forwarding are not inherently tied to OMP. Automatic response bridging **is OMP-specific today**: the daemon discovers the target's OMP session JSONL through Herdr metadata and parses OMP `assistant` message events. Other tools can still receive inbound WeChat text in a pane, but they will not automatically reply back to WeChat unless an adapter is added for that tool's response stream/schema. See the Roadmap section below for the deferred adapter plan.
 
 ### WeChat commands
 
@@ -101,6 +100,30 @@ herdr plugin action invoke local.herdr-weixin-relay.status
 herdr plugin action invoke local.herdr-weixin-relay.stop
 ```
 
+### Roadmap
+
+Automatic response bridging is currently OMP-specific — it watches OMP session JSONL through Herdr metadata and parses OMP `assistant` events. Future work will make the response bridge adapter-based so other tools can participate without pretending to be OMP.
+
+- Split current OMP JSONL parsing into a proper response adapter.
+- Add `HERDR_WEIXIN_RESPONSE_ADAPTER=auto|omp|none`.
+- Keep WeChat transport and Herdr forwarding truly generic.
+- In `auto` mode, select the adapter from `agent_session.source`.
+- For unsupported tools, maintain inbound forwarding but skip automatic WeChat replies (with a clear log message).
+- Add adapters **only** with real sanitized fixtures per tool:
+  - OpenCode
+  - Claude Code
+  - Pi
+  - AGY
+  - other Herdr-launched agents
+- Each adapter needs fixture coverage for:
+  - session path/source discovery
+  - cursor/resume behavior
+  - assistant/final-response detection
+  - thinking/tool-call/result filtering
+  - stable response IDs for duplicate prevention
+
+Do not ship placeholder adapters. Unsupported tools are explicit instead of silently mis-parsing transcripts.
+
 ---
 
 ## 中文
@@ -114,7 +137,6 @@ Local Herdr 插件 + PID 文件 Node 守护进程，通过腾讯 `ilink` bot 协
 - `ilink.mjs` — 二维码登录、`getupdates` 和文本 `sendmessage` 协议调用。
 - `lib.mjs` — 配置/状态、PID、目标、工作区与 Herdr 辅助函数。
 - `check.mjs` — 使用伪造 ilink 服务器进行本地协议自检。
-- `TODO.md` — 延后的兼容性与响应适配器工作。
 - `README.md` — 本文件。
 
 ### 快速开始
@@ -174,7 +196,7 @@ node cli.mjs login
 
 ### 兼容性
 
-微信登录、长轮询、出站 `send-test` 和基础的微信到 Herdr 转发并不天然绑定 OMP。自动回复桥接**目前是 OMP 专用**：守护进程通过 Herdr 元数据找到目标的 OMP 会话 JSONL，并解析 OMP 的 `assistant` 消息事件。其他工具仍然可以在面板中接收入站微信文本，但除非为该工具的响应流/数据结构添加适配器，否则不会自动把回复发回微信。延后的适配器计划见 `TODO.md`。
+微信登录、长轮询、出站 `send-test` 和基础的微信到 Herdr 转发并不天然绑定 OMP。自动回复桥接**目前是 OMP 专用**：守护进程通过 Herdr 元数据找到目标的 OMP 会话 JSONL，并解析 OMP 的 `assistant` 消息事件。其他工具仍然可以在面板中接收入站微信文本，但除非为该工具的响应流/数据结构添加适配器，否则不会自动把回复发回微信。延后的适配器计划见下方路线图章节。
 
 ### 微信命令
 
@@ -196,3 +218,27 @@ herdr plugin action invoke local.herdr-weixin-relay.start
 herdr plugin action invoke local.herdr-weixin-relay.status
 herdr plugin action invoke local.herdr-weixin-relay.stop
 ```
+
+### 路线图
+
+自动回复桥接目前是 OMP 专用——通过 Herdr 元数据监听 OMP 会话 JSONL 并解析 OMP `assistant` 事件。后续将改为适配器架构，使其他工具无需假装成 OMP 即可参与。
+
+- 将当前 OMP JSONL 解析抽取为响应适配器。
+- 添加 `HERDR_WEIXIN_RESPONSE_ADAPTER=auto|omp|none` 配置。
+- 保持微信传输和 Herdr 转发的真正通用性。
+- `auto` 模式根据 `agent_session.source` 自动选择适配器。
+- 对不支持的工具，维持入站转发，但跳过自动回复（并记录清晰日志）。
+- **仅在有真实清理后的测试数据（fixture）时** 为每个工具添加适配器：
+  - OpenCode
+  - Claude Code
+  - Pi
+  - AGY
+  - 其他 Herdr 启动的代理
+- 每个适配器需要包含以下 fixture 覆盖：
+  - 会话路径/来源发现
+  - 光标（cursor）/恢复行为
+  - 助手/最终回复检测
+  - 思考过程/工具调用/结果过滤
+  - 用于去重的稳定回复 ID
+
+不提供占位适配器。不支持的工具应明确说明，而不是静默解析错误。
