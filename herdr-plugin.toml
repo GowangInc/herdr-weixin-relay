@@ -2,7 +2,7 @@ id = "local.herdr-weixin-relay"
 name = "Herdr Weixin Relay"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Relay personal WeChat text messages to a configured Herdr target."
+description = "Bidirectional WeChat message relay for Herdr: QR login, PID daemon, OMP agent-session routing, and automatic response bridging."
 platforms = ["linux"]
 
 [[actions]]
