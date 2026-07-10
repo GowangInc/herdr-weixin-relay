@@ -23,7 +23,7 @@ Local Herdr plugin + PID-file Node daemon for relaying personal WeChat text mess
 ### Quick start
 
 ```sh
-herdr plugin link /mnt/qm2/toys/herdr-weixin-relay
+herdr plugin link /path/to/herdr-weixin-relay
 herdr plugin action invoke local.herdr-weixin-relay.doctor
 herdr plugin action invoke local.herdr-weixin-relay.setup        # create/focus Weixin Relay workspace
 herdr plugin action invoke local.herdr-weixin-relay.target-current
@@ -47,7 +47,7 @@ herdr plugin action invoke local.herdr-weixin-relay.start
 If you prefer a normal terminal pane instead of the plugin tab:
 
 ```sh
-cd /mnt/qm2/toys/herdr-weixin-relay
+cd /path/to/herdr-weixin-relay
 node cli.mjs login
 ```
 
@@ -109,7 +109,7 @@ herdr plugin action invoke local.herdr-weixin-relay.stop
 ### 快速开始
 
 ```sh
-herdr plugin link /mnt/qm2/toys/herdr-weixin-relay
+herdr plugin link /path/to/herdr-weixin-relay
 herdr plugin action invoke local.herdr-weixin-relay.doctor
 herdr plugin action invoke local.herdr-weixin-relay.setup        # 创建或聚焦 Weixin Relay 工作区
 herdr plugin action invoke local.herdr-weixin-relay.target-current
@@ -133,7 +133,7 @@ herdr plugin action invoke local.herdr-weixin-relay.start
 如果你更喜欢在普通终端面板中操作：
 
 ```sh
-cd /mnt/qm2/toys/herdr-weixin-relay
+cd /path/to/herdr-weixin-relay
 node cli.mjs login
 ```
 
