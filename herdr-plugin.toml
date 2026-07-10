@@ -1,0 +1,58 @@
+id = "local.herdr-weixin-relay"
+name = "Herdr Weixin Relay"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Relay personal WeChat text messages to a configured Herdr target."
+platforms = ["linux"]
+
+[[actions]]
+id = "login"
+title = "Login to WeChat"
+command = ["node", "cli.mjs", "open-login"]
+
+[[actions]]
+id = "start"
+title = "Start Weixin relay daemon"
+command = ["node", "cli.mjs", "start"]
+
+[[actions]]
+id = "stop"
+title = "Stop Weixin relay daemon"
+command = ["node", "cli.mjs", "stop"]
+
+[[actions]]
+id = "status"
+title = "Show Weixin relay status"
+command = ["node", "cli.mjs", "status"]
+
+[[actions]]
+id = "doctor"
+title = "Check Weixin relay prerequisites"
+command = ["node", "cli.mjs", "doctor"]
+
+[[actions]]
+id = "setup"
+title = "Open Weixin Relay workspace"
+command = ["node", "cli.mjs", "setup"]
+
+[[actions]]
+id = "target-current"
+title = "Route WeChat to focused pane or agent"
+command = ["node", "cli.mjs", "target-current"]
+
+[[actions]]
+id = "send-test"
+title = "Send WeChat test message"
+command = ["node", "cli.mjs", "send-test"]
+
+[[panes]]
+id = "login"
+title = "WeChat QR Login"
+placement = "tab"
+command = ["node", "cli.mjs", "login"]
+
+[[panes]]
+id = "logs"
+title = "Weixin Relay Logs"
+placement = "tab"
+command = ["node", "cli.mjs", "logs"]
